@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FireGuard Pro — 소방 점검 재고관리</title>
+    <meta name="description" content="소방 점검 업체를 위한 스마트 재고관리 SaaS. 현장 점검 입력과 실시간 재고 모니터링을 한 곳에서.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ===== 에러 토스트 컨테이너 ===== -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- ===== 하단 네비게이션 ===== -->
+    <nav id="bottom-nav">
+        <button class="nav-btn active" data-view="inspection" id="nav-inspection">
+            <i class="fa-solid fa-clipboard-check"></i>
+            <span>점검 입력</span>
+        </button>
+        <button class="nav-btn" data-view="dashboard" id="nav-dashboard">
+            <i class="fa-solid fa-chart-pie"></i>
+            <span>재고 현황</span>
+        </button>
+        <button class="nav-btn" data-view="notifications" id="nav-notifications">
+            <i class="fa-solid fa-comment-dots"></i>
+            <span>알림</span>
+            <span class="nav-notif-badge hidden" id="nav-notif-badge">0</span>
+        </button>
+        <button class="nav-btn" data-view="history" id="nav-history">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <span>이력</span>
+        </button>
+    </nav>
+
+    <!-- ===== 화면 1: 점검 입력 (모바일 우선) ===== -->
+    <main id="view-inspection" class="view active">
+        <!-- 헤더 -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-area">
+                    <div class="logo-icon"><i class="fa-solid fa-fire-extinguisher"></i></div>
+                    <div>
+                        <h1>FireGuard <span class="accent">Pro</span></h1>
+                        <p class="subtitle">점검 일지 작성</p>
+                    </div>
+                </div>
+                <div class="header-date" id="header-date"></div>
+            </div>
+        </header>
+
+        <div class="page-content">
+            <!-- Step 1: 현장 선택 -->
+            <section class="card step-card" id="step-site">
+                <div class="step-badge">STEP 1</div>
+                <h2 class="card-title"><i class="fa-solid fa-location-dot"></i> 현장 선택</h2>
+                <div class="site-selector">
+                    <select id="select-company" class="form-select">
+                        <option value="">업체를 선택하세요</option>
+                    </select>
+                    <select id="select-site" class="form-select" disabled>
+                        <option value="">현장을 선택하세요</option>
+                    </select>
+                </div>
+                <div id="site-info-banner" class="info-banner hidden">
+                    <i class="fa-solid fa-building"></i>
+                    <div>
+                        <strong id="selected-site-name"></strong>
+                        <span id="selected-site-address"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 2: 사용 부품 입력 -->
+            <section class="card step-card" id="step-parts">
+                <div class="step-badge">STEP 2</div>
+                <h2 class="card-title"><i class="fa-solid fa-wrench"></i> 사용 부품 입력</h2>
+                <div id="parts-list" class="parts-list">
+                    <!-- JS로 동적 생성 -->
+                </div>
+                <button id="btn-add-part" class="btn-add-part">
+                    <i class="fa-solid fa-plus"></i> 부품 추가
+                </button>
+            </section>
+
+            <!-- Step 3: 점검 내용 & 사진 -->
+            <section class="card step-card" id="step-photo">
+                <div class="step-badge">STEP 3</div>
+                <h2 class="card-title"><i class="fa-solid fa-camera"></i> 점검 내용 & 사진</h2>
+                <div class="form-group">
+                    <label for="inspector-name">점검자 이름</label>
+                    <input type="text" id="inspector-name" class="form-input" placeholder="홍길동">
+                </div>
+                <div class="form-group">
+                    <label for="check-details">점검 내용 메모</label>
+                    <textarea id="check-details" class="form-textarea" rows="3" placeholder="특이사항을 입력하세요..."></textarea>
+                </div>
+                <div class="photo-upload-area" id="photo-upload-area">
+                    <input type="file" id="photo-input" accept="image/*" multiple hidden>
+                    <div class="upload-placeholder" id="upload-placeholder">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <p>터치하여 사진 업로드</p>
+                        <span>JPG, PNG (최대 5장)</span>
+                    </div>
+                    <div id="photo-preview-grid" class="photo-preview-grid"></div>
+                </div>
+            </section>
+
+            <!-- 제출 버튼 -->
+            <button id="btn-submit" class="btn-submit">
+                <i class="fa-solid fa-paper-plane"></i> 점검 일지 제출
+            </button>
+        </div>
+
+        <!-- 제출 성공 모달 -->
+        <div id="success-modal" class="modal-overlay hidden">
+            <div class="modal-content success-modal">
+                <div class="success-icon-wrap">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <h2>제출 완료!</h2>
+                <p>점검 일지가 성공적으로 저장되었습니다.<br>사용 부품의 재고가 자동 차감되었습니다.</p>
+                <div id="deduction-summary" class="deduction-summary"></div>
+
+                <!-- 알림톡 발송 상태 -->
+                <div id="notif-status-section" class="notif-status-section">
+                    <div class="notif-status-header">
+                        <i class="fa-solid fa-comment-dots"></i>
+                        <span>알림톡 자동 발송</span>
+                    </div>
+                    <div id="notif-status-body" class="notif-status-body">
+                        <div class="notif-sending">
+                            <div class="spinner"></div>
+                            <span>현장 담당자에게 발송 중...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-close-modal" class="btn-primary">확인</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===== 화면 2: 관리자 대시보드 ===== -->
+    <main id="view-dashboard" class="view">
+        <header class="app-header dashboard-header">
+            <div class="header-content">
+                <div class="logo-area">
+                    <div class="logo-icon"><i class="fa-solid fa-fire-extinguisher"></i></div>
+                    <div>
+                        <h1>FireGuard <span class="accent">Pro</span></h1>
+                        <p class="subtitle">관리자 대시보드</p>
+                    </div>
+                </div>
+                <div class="admin-badge"><i class="fa-solid fa-shield-halved"></i> Admin</div>
+            </div>
+        </header>
+
+        <div class="page-content dashboard-content">
+            <!-- KPI 카드들 -->
+            <section class="kpi-row">
+                <div class="kpi-card">
+                    <div class="kpi-icon blue"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    <div class="kpi-data">
+                        <span class="kpi-value" id="kpi-total-items">0</span>
+                        <span class="kpi-label">전체 품목</span>
+                    </div>
+                </div>
+                <div class="kpi-card warning">
+                    <div class="kpi-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="kpi-data">
+                        <span class="kpi-value" id="kpi-low-stock">0</span>
+                        <span class="kpi-label">부족 품목</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon green"><i class="fa-solid fa-clipboard-check"></i></div>
+                    <div class="kpi-data">
+                        <span class="kpi-value" id="kpi-today-checks">0</span>
+                        <span class="kpi-label">오늘 점검</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon purple"><i class="fa-solid fa-building"></i></div>
+                    <div class="kpi-data">
+                        <span class="kpi-value" id="kpi-total-sites">0</span>
+                        <span class="kpi-label">관리 현장</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 부족 품목 경고 -->
+            <section id="alert-section" class="card alert-card hidden">
+                <div class="alert-header">
+                    <h2><i class="fa-solid fa-bell shake"></i> 재고 부족 경고</h2>
+                    <span class="alert-count" id="alert-count">0</span>
+                </div>
+                <div id="alert-list" class="alert-list"></div>
+            </section>
+
+            <!-- 차트 영역 -->
+            <div class="chart-grid">
+                <section class="card chart-card">
+                    <h2 class="card-title"><i class="fa-solid fa-chart-bar"></i> 품목별 현재고 vs 적정재고</h2>
+                    <div class="chart-container">
+                        <canvas id="chart-stock"></canvas>
+                    </div>
+                </section>
+                <section class="card chart-card">
+                    <h2 class="card-title"><i class="fa-solid fa-chart-pie"></i> 재고 상태 비율</h2>
+                    <div class="chart-container chart-container-doughnut">
+                        <canvas id="chart-status"></canvas>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 전체 재고 테이블 -->
+            <section class="card">
+                <h2 class="card-title"><i class="fa-solid fa-table-list"></i> 전체 재고 현황</h2>
+                <div class="table-wrap">
+                    <table id="inventory-table" class="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>부품명</th>
+                                <th>현재고</th>
+                                <th>적정재고</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 최근 점검 로그 -->
+            <section class="card">
+                <h2 class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> 최근 점검 내역</h2>
+                <div id="recent-logs" class="recent-logs"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- ===== 화면 3: 알림 내역 ===== -->
+    <main id="view-notifications" class="view">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-area">
+                    <div class="logo-icon"><i class="fa-solid fa-fire-extinguisher"></i></div>
+                    <div>
+                        <h1>FireGuard <span class="accent">Pro</span></h1>
+                        <p class="subtitle">알림톡 발송 내역</p>
+                    </div>
+                </div>
+                <div class="admin-badge"><i class="fa-solid fa-comment-dots"></i> KakaoTalk</div>
+            </div>
+        </header>
+        <div class="page-content">
+            <section class="card">
+                <h2 class="card-title"><i class="fa-solid fa-paper-plane"></i> 발송 기록</h2>
+                <div id="notif-log-list" class="notif-log-list">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>아직 발송된 알림이 없습니다.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- ===== 화면 4: 재고 이력 ===== -->
+    <main id="view-history" class="view">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-area">
+                    <div class="logo-icon"><i class="fa-solid fa-fire-extinguisher"></i></div>
+                    <div>
+                        <h1>FireGuard <span class="accent">Pro</span></h1>
+                        <p class="subtitle">재고 변동 이력</p>
+                    </div>
+                </div>
+                <div class="admin-badge"><i class="fa-solid fa-scroll"></i> Audit Log</div>
+            </div>
+        </header>
+        <div class="page-content">
+            <!-- 이력 필터 -->
+            <section class="card filter-card">
+                <div class="filter-row">
+                    <select id="history-filter-type" class="form-select filter-select">
+                        <option value="all">전체 유형</option>
+                        <option value="deduct">차감 (사용)</option>
+                        <option value="add">입고 (추가)</option>
+                    </select>
+                    <div class="history-count-badge">
+                        <i class="fa-solid fa-list"></i>
+                        <span id="history-total-count">0건</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 이력 타임라인 -->
+            <section class="card">
+                <h2 class="card-title"><i class="fa-solid fa-timeline"></i> 변동 타임라인</h2>
+                <div id="history-timeline" class="history-timeline">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>아직 재고 변동 이력이 없습니다.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
